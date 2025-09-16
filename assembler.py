@@ -15,26 +15,31 @@ with open('SType.json') as f:
 with open('UType.json') as f:
     UType = json.load(f)
 
+INSTR_OK = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
 
 class CalcLexer(Lexer):
-    tokens = {INSTRUCCION, REGISTRO, NUMERO}
+    tokens = { 'INSTRUCCION', 'REGISTRO' }
+
+    # Literales (devolverán el carácter tal cual como token)
+    literals = { ',' }
+
     ignore = ' \t'
+
     ignore_newline = r'\n+'
 
     INSTRUCCION = r'[a-zA-Z]+'
-    REGISTRO = r'x[0-9]|x1[0-9]|x2[0-9]|x3[0-1]'
+
+    # Registros x0..x31
+    REGISTRO = r'x(?:[0-9]|[12][0-9]|3[01])'
 
     def INSTRUCCION(self, t):
-        self.t = t.lower()#pone en minusculas la instruccion
-
-        # Verifica si la instrucción está en alguno de los diccionarios
-        if (t.value not in BType) and (t.value not in IType) and 
-           (t.value not in JType) and (t.value not in RType) and 
-           (t.value not in SType) and (t.value not in UType):
+        t.value = t.value.lower() #Normaliza a minúsculas
+        #Valida contra los diccionarios
+        if t.value not in INSTR_OK:
             self.error(t)
             return None
         return t
 
     def error(self, t):
-        print(f"Illegal instruction or character '{t.value}'")
+        print(f"Se ha encontrado un error de sintaxis: '{t.value}' en la posición {self.index}")
         self.index += 1
