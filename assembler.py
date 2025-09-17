@@ -72,7 +72,7 @@ class CalcLexer(Lexer):
 
 
 
-data = "slli, "
+data = "slli, x5, x6, 4"
 
 lexer = CalcLexer()
 for tok in lexer.tokenize(data):
