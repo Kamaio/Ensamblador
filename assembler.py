@@ -15,16 +15,13 @@ with open('SType.json') as f:
 with open('UType.json') as f:
     UType = json.load(f)
 
-INSTR_OK = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
+DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
 
 class CalcLexer(Lexer):
-    tokens = { 'INSTRUCCION', 'REGISTRO' }
+    tokens = {'INSTRUCCION', 'REGISTRO'}
 
-    # Literales (devolverán el carácter tal cual como token)
     literals = { ',' }
-
     ignore = ' \t'
-
     ignore_newline = r'\n+'
 
     INSTRUCCION = r'[a-zA-Z]+'
@@ -35,7 +32,7 @@ class CalcLexer(Lexer):
     def INSTRUCCION(self, t):
         t.value = t.value.lower() #Normaliza a minúsculas
         #Valida contra los diccionarios
-        if t.value not in INSTR_OK:
+        if t.value not in DICCIONARIOS:
             self.error(t)
             return None
         return t
