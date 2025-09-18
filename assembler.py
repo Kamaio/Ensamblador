@@ -20,11 +20,14 @@ with open('REGnames.json') as f:
 DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
 
 class CalcLexer(Lexer):
-    tokens = {"INSTRUCCION", "REGISTRO", "INMEDIATO"}
+    tokens = {"INSTRUCCION", "REGISTRO", "INMEDIATO", "COMA", "PARENTESIS1", "PARENTESIS2"}
 
-    literals = { ',' }
     ignore = ' \t'
     ignore_newline = r'\n+'
+
+    COMA  = r'\,'
+    PARENTESIS1 = r'\('
+    PARENTESIS2 = r'\)'
 
 
     @_(r'x[0-9]|x[12][0-9]|x3[01]|zero|ra|sp|gp|tp|fp|t[0-6]|s[0-9]|s1[01]|a[0-7]')
@@ -63,7 +66,6 @@ class CalcLexer(Lexer):
             return None
         return t
 
-    
 
     def error(self, t):
         print(f"Se ha encontrado un error de sintaxis--> '{t.value}' en la posición {self.index}")
@@ -72,8 +74,61 @@ class CalcLexer(Lexer):
 
 
 
-data = "slli, x5, x6, 4"
+class ExprParser(Parser):
+    tokens = CalcLexer.tokens
 
+    @_('INSTRUCCION REGISTRO COMA REGISTRO COMA REGISTRO')
+    def instruccionR(self, p):
+        if(p.INSTRUCCION in RType):
+            return ("RType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.REGISTRO2)
+        else: 
+            raise SyntaxError(f"Instrucción R no reconocida: {p.INSTR}")
+
+    @_('INSTRUCCION REGISTRO COMA REGISTRO COMA INMEDIATO')
+    def intruccionI(self, p):
+        if(p.INSTRUCCION in IType):
+            return ("IType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
+        else: 
+            raise SyntaxError(f"Instrucción I no reconocida: {p.INSTR}")
+
+    '''
+    @_('INSTRUCCION REGISTRO INMEDIATO')
+    def expr(self, p):
+        return ('IType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
+    
+
+    @_('INSTRUCCION REGISTRO INMEDIATO(REGISTRO)')
+    def expr(self, p):
+        return ('SType', p.INSTRUCCION, p.REGISTRO0, p.INMEDIATO, p.REGISTRO1)
+
+    @_('INSTRUCCION REGISTRO REGISTRO INMEDIATO')
+    def expr(self, p):
+        return ('BType', p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
+
+    @_('INSTRUCCION REGISTRO INMEDIATO')
+    def expr(self, p):
+        return ('UType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
+
+    @_('INSTRUCCION REGISTRO INMEDIATO')
+    def expr(self, p):
+        return ('JType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
+    '''
+
+
+
+#--------------------------------------------------------------------------#        
+with open('input.asm') as f:
+    data = f.read()
+
+
+#parte todo en pedazos
 lexer = CalcLexer()
-for tok in lexer.tokenize(data):
-    print(f"{tok.type}: {tok.value}")
+tokens = lexer.tokenize(data)
+for tok in tokens: print(f"{tok.type}: {tok.value}")
+
+#mira la estructura y si coincide con las reglas devuelve la informacion
+parser = ExprParser()
+result = parser.parse(lexer.tokenize(data))
+print(result)
+
+
