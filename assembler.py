@@ -121,7 +121,9 @@ with open('input.asm') as f:
 
     12, 14, 123, 13
 
-
+PC = 0
+outputBinario = open("output.bin", "a")
+outputHexadecimal = open("output.hex", "a")
 for line in data.split('\n'):
     if(not line.strip()): continue #salta lineas vacias
 
@@ -134,6 +136,53 @@ for line in data.split('\n'):
     parser = ExprParser()
     result = parser.parse(lexer.tokenize(line))
     print(result)
+
+    if(result[0] == "RType"):
+        instruccion = RType[result[1]]
+        rd = result[2]
+        rs1 = result[3]
+        rs2 = result[4]
+
+        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, rs2: {rs2}")
+
+        #ordena la instrucción en binario
+        binario = 0
+        binario |= (int(instruccion[2], 2) << 25)
+        binario |= (rs2 << 20)
+        binario |= (rs1 << 15)
+        binario |= (int(instruccion[1], 2) << 12)
+        binario |= (rd << 7)
+        binario |= (int(instruccion[0], 2))
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+
+    if(result[0] == "IType"):
+        instruccion = IType[result[1]]
+        rd = result[2]
+        rs1 = result[3]
+        inmediato = result[4]
+
+        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+
+        #ordena la instrucción en binario
+        binario = 0
+        binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
+        binario |= (rs1 << 15)
+        binario |= (int(instruccion[1], 2) << 12)
+        binario |= (rd << 7)
+        binario |= (int(instruccion[0], 2))
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+
+    PC += 4
 
 
 
