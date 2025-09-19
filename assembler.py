@@ -116,16 +116,37 @@ class ExprParser(Parser):
 
 
 #--------------------------------------------------------------------------#        
-with open('input.asm') as f:
-    data = f.read()
-
-    12, 14, 123, 13
+with open('input.asm') as f: data = f.read()
 
 PC = 0
-outputBinario = open("output.bin", "a")
-outputHexadecimal = open("output.hex", "a")
+labels = {}
+outputBinario = open("output.bin", "w")
+outputHexadecimal = open("output.hex", "w")
+
+
+
+#primera pasada: busca las etiquetas y las guarda en un diccionario con su posición
 for line in data.split('\n'):
+    
+    if(line.strip().endswith(":")): 
+
+        if(" " in line.strip()[:-1]): raise SyntaxError("No se permiten espacios en las etiquetas")
+
+        label = line.strip()[:-1] #elimina los espacios y los dos puntos
+        labels[label] = PC
+        continue
+
     if(not line.strip()): continue #salta lineas vacias
+    else: PC += 4
+
+print(f"labels: {labels}")
+
+
+
+#segunda pasada: organiza y guarda las instrucciones
+PC = 0
+for line in data.split('\n'):
+    if(not line.strip() or line.strip().endswith(":")): continue #salta lineas vacias o labels
 
     #parte todo en pedazos
     lexer = CalcLexer()
