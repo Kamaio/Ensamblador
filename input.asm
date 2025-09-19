@@ -1,8 +1,4 @@
-
-
 cosa:
-sb t0, 0(a1)
+addi x5, x0, 11
 
-cos2:
-sh t0, 0(a1)
-sw t0, 0(a1)
+beq x1, x5, cosa

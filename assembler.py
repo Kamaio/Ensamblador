@@ -1,6 +1,11 @@
 from sly import Lexer, Parser
 import json
 
+
+def complementoA2(num, bits):
+    if num < 0: return (1 << bits) + num
+    else: return num
+
 # Cargar diccionarios de instrucciones
 with open('BType.json') as f:
     BType = json.load(f)
@@ -18,9 +23,10 @@ with open('REGnames.json') as f:
     REGnames = json.load(f)
 
 DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
+labels = {}
 
 class CalcLexer(Lexer):
-    tokens = {"INSTRUCCION", "REGISTRO", "INMEDIATO", "COMA", "PARENTESIS1", "PARENTESIS2"}
+    tokens = {"INSTRUCCION", "REGISTRO", "INMEDIATO", "COMA", "PARENTESIS1", "PARENTESIS2", }
 
     ignore = ' \t'
     ignore_newline = r'\n+'
@@ -60,7 +66,7 @@ class CalcLexer(Lexer):
     def INSTRUCCION(self, t):
         t.value = t.value.lower() #Normaliza a minúsculas
         #Valida contra los diccionarios
-        if t.value not in DICCIONARIOS:
+        if t.value not in DICCIONARIOS and t.value not in labels:
             print("Error en instruccion")
             self.error(t)
             return None
@@ -101,16 +107,15 @@ class ExprParser(Parser):
             raise SyntaxError(f"Instrucción I o S no reconocida: {p.INSTRUCCION}")
 
 
+    @_('INSTRUCCION REGISTRO COMA REGISTRO COMA INSTRUCCION')
+    def expr(self, p):
+        if(p.INSTRUCCION0 in BType):
+            return ("BType", p.INSTRUCCION0, p.REGISTRO0, p.REGISTRO1, p.INSTRUCCION1)
+        else: 
+            raise SyntaxError(f"Instrucción B no reconocida: {p.INSTRUCCION0}")
+
+
     '''
-    @_('INSTRUCCION REGISTRO INMEDIATO')
-    def expr(self, p):
-        return ('IType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
-    
-
-    @_('INSTRUCCION REGISTRO INMEDIATO(REGISTRO)')
-    def expr(self, p):
-        return ('SType', p.INSTRUCCION, p.REGISTRO0, p.INMEDIATO, p.REGISTRO1)
-
     @_('INSTRUCCION REGISTRO REGISTRO INMEDIATO')
     def expr(self, p):
         return ('BType', p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
@@ -130,7 +135,7 @@ class ExprParser(Parser):
 with open('input.asm') as f: data = f.read()
 
 PC = 0
-labels = {}
+
 outputBinario = open("output.bin", "w")
 outputHexadecimal = open("output.hex", "w")
 
@@ -254,9 +259,33 @@ for line in data.split('\n'):
         print(f"Hexadecimal: {hex(binario)}")
         
     if(result[0] == "BType"):
-        print("BType")
+        instruccion = result[1]
+        rs1 = result[2]
+        rs2 = result[3]
+        label = result[4]
 
+        if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
+        inmediato += labels[label] - PC
+        inmediato = complementoA2(inmediato, 13) #si es negativo se convierte a complemento a 2 de 13 bits
 
+        print(f"Instrucción: {instruccion}, rs1: {rs1}, rs2: {rs2}, label: {label}, inmediato calculado(nuevo PC): {inmediato}")
+
+        binario = 0
+        binario |= ((inmediato & 0b1000000000000) << 31) #bit 12 del inmediato va al bit 31
+        binario |= ((inmediato & 0b0111110000000) << 25) #bits 10:5 del inmediato van a los bits 30:25
+        binario |= (rs2 << 20)
+        binario |= (rs1 << 15)
+        binario |= (int(BType[instruccion][1], 2) << 12)
+        binario |= ((inmediato & 0b0000001111110) << 8) #bits 4:1 del inmediato van a los bits 11:8
+        binario |= ((inmediato & 0b0000000000001) << 7) #bit 11 del inmediato va al bit 7
+        binario |= (int(BType[instruccion][0], 2))
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+        
 
 
     PC += 4
