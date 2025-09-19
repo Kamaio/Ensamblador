@@ -189,7 +189,22 @@ for line in data.split('\n'):
 
         print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
 
+
+        if(result[1] == "slli" or result[1] == "srli"):
+            if(inmediato < 0 or inmediato > 31): raise ValueError(f"El inmediato para {instruccion} debe estar entre 0 y 31")
+            inmediato = bin(inmediato)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y lo convierte a binario de 12 bits
+            inmediato = int(inmediato, 2)
+
+        elif(result[1] == 'srai'):
+            if(inmediato < 0 or inmediato > 31): raise ValueError(f"El inmediato para {instruccion} debe estar entre 0 y 31")
+            inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y le pone el bit 10 en 1 para indicar que es srai
+            inmediato = int(inmediato, 2)
+
+        else:
+            if(inmediato < -2048 or inmediato > 2047): raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
+
         #ordena la instrucción en binario
+        
         binario = 0
         binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
         binario |= (rs1 << 15)
