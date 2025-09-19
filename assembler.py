@@ -90,6 +90,17 @@ class ExprParser(Parser):
         else: 
             raise SyntaxError(f"Instrucción I no reconocida: {p.INSTRUCCION}")
 
+
+    @_('INSTRUCCION REGISTRO COMA INMEDIATO PARENTESIS1 REGISTRO PARENTESIS2')
+    def expr(self, p):
+        if(p.INSTRUCCION in IType):
+            return ("IType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
+        elif(p.INSTRUCCION in SType):
+            return ("SType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
+        else: 
+            raise SyntaxError(f"Instrucción I o S no reconocida: {p.INSTRUCCION}")
+
+
     '''
     @_('INSTRUCCION REGISTRO INMEDIATO')
     def expr(self, p):
@@ -204,7 +215,6 @@ for line in data.split('\n'):
             if(inmediato < -2048 or inmediato > 2047): raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
 
         #ordena la instrucción en binario
-        
         binario = 0
         binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
         binario |= (rs1 << 15)
@@ -217,6 +227,37 @@ for line in data.split('\n'):
 
         outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
         print(f"Hexadecimal: {hex(binario)}")
+
+    if(result[0] == "SType"):
+        instruccion = SType[result[1]]
+        rd = result[2]
+        rs1 = result[3]
+        inmediato = result[4]
+
+        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+
+        if(inmediato < -2048 or inmediato > 2047): raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
+
+
+        binario = 0
+        binario |= ((inmediato & 0b111111100000) << 25)
+        binario |= (rd << 20)
+        binario |= (rs1 << 15)
+        binario |= (int(instruccion[1], 2) << 12)
+        binario |= ((inmediato & 0b000000011111) << 7)
+        binario |= (int(instruccion[0], 2))
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+        
+    if(result[0] == "BType"):
+        print("BType")
+
+
+
 
     PC += 4
 
