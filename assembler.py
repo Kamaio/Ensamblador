@@ -73,23 +73,22 @@ class CalcLexer(Lexer):
 
 
 
-
 class ExprParser(Parser):
     tokens = CalcLexer.tokens
 
     @_('INSTRUCCION REGISTRO COMA REGISTRO COMA REGISTRO')
-    def instruccionR(self, p):
+    def expr(self, p):
         if(p.INSTRUCCION in RType):
             return ("RType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.REGISTRO2)
         else: 
-            raise SyntaxError(f"Instrucción R no reconocida: {p.INSTR}")
+            raise SyntaxError(f"Instrucción R no reconocida: {p.INSTRUCCION}")
 
     @_('INSTRUCCION REGISTRO COMA REGISTRO COMA INMEDIATO')
-    def intruccionI(self, p):
+    def expr(self, p):
         if(p.INSTRUCCION in IType):
             return ("IType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
         else: 
-            raise SyntaxError(f"Instrucción I no reconocida: {p.INSTR}")
+            raise SyntaxError(f"Instrucción I no reconocida: {p.INSTRUCCION}")
 
     '''
     @_('INSTRUCCION REGISTRO INMEDIATO')
@@ -120,15 +119,24 @@ class ExprParser(Parser):
 with open('input.asm') as f:
     data = f.read()
 
+    12, 14, 123, 13
 
-#parte todo en pedazos
-lexer = CalcLexer()
-tokens = lexer.tokenize(data)
-for tok in tokens: print(f"{tok.type}: {tok.value}")
 
-#mira la estructura y si coincide con las reglas devuelve la informacion
-parser = ExprParser()
-result = parser.parse(lexer.tokenize(data))
-print(result)
+for line in data.split('\n'):
+    if(not line.strip()): continue #salta lineas vacias
+
+    #parte todo en pedazos
+    lexer = CalcLexer()
+    tokens = lexer.tokenize(line)
+    for tok in tokens: print(f"{tok.type}: {tok.value}")
+
+    #mira la estructura y si coincide con las reglas devuelve la informacion
+    parser = ExprParser()
+    result = parser.parse(lexer.tokenize(line))
+    print(result)
+
+
+
+    
 
 
