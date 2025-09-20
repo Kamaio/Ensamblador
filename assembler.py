@@ -2,9 +2,10 @@ from sly import Lexer, Parser
 import json
 
 
-def complementoA2(num, bits):
-    if num < 0: return (1 << bits) + num
-    else: return num
+def complementoA2(val, bits):
+    if val < 0:
+        val = (1 << bits) + val
+    return format(val & ((1 << bits) - 1), f'0{bits}b')
 
 # Cargar diccionarios de instrucciones
 with open('BType.json') as f:
@@ -36,7 +37,7 @@ class CalcLexer(Lexer):
     PARENTESIS2 = r'\)'
 
 
-    @_(r'x[0-9]|x[12][0-9]|x3[01]|zero|ra|sp|gp|tp|fp|t[0-6]|s[0-9]|s1[01]|a[0-7]')
+    @_(r'x3[01]|x[12][0-9]|x[0-9]|zero|ra|sp|gp|tp|fp|t[0-6]|s1[01]|s[0-9]|a[0-7]')
     def REGISTRO(self, t):
         try:
             if t.value.startswith('x'):
@@ -235,29 +236,27 @@ for line in data.split('\n'):
 
     if(result[0] == "SType"):
         instruccion = SType[result[1]]
-        rd = result[2]
+        rs2 = result[2]
         rs1 = result[3]
         inmediato = result[4]
+        print(f"Instrucción: {instruccion}, rs2: {rs2}, rs1: {rs1}, inmediato: {inmediato}")
 
-        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
-
-        if(inmediato < -2048 or inmediato > 2047): raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
-
+        if inmediato < -2048 or inmediato > 2047: raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
+        inmediato = int(complementoA2(inmediato, 12), 2)
+        print(f"inmediato que estamos procesando: {inmediato}")
 
         binario = 0
-        binario |= ((inmediato & 0b111111100000) << 25)
-        binario |= (rd << 20)
+        binario |= ((inmediato >> 5) & 0b1111111) << 25
+        binario |= (rs2 << 20)
         binario |= (rs1 << 15)
         binario |= (int(instruccion[1], 2) << 12)
-        binario |= ((inmediato & 0b000000011111) << 7)
-        binario |= (int(instruccion[0], 2))
+        # bits 4:0 -> pos 11:7
+        binario |= (inmediato & 0b11111) << 7
+        binario |= int(instruccion[0], 2)
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
-
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
-        
+        binario_str = bin(binario)[2:].zfill(32)
+        print(f"Binario: {binario_str}\nHexadecimal: {hex(binario)}")
+ 
     if(result[0] == "BType"):
         instruccion = result[1]
         rs1 = result[2]
@@ -265,20 +264,26 @@ for line in data.split('\n'):
         label = result[4]
 
         if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
-        inmediato += labels[label] - PC
-        inmediato = complementoA2(inmediato, 13) #si es negativo se convierte a complemento a 2 de 13 bits
+        inmediato = labels[label] - PC
+        print(f"{inmediato} =+ {labels[label]} - {PC}")
+
+        inmediato = int(complementoA2(inmediato, 13), 2)
+        #inmediato = inmediato >> 6 #si es negativo se convierte a complemento a 2 de 13 bits
+        print(f"inmediato que estamos procesando: {bin(inmediato & 0b1111111111111)}")
+        print(f"que hace esto? {bin(inmediato & 0b1000000000000)}")
 
         print(f"Instrucción: {instruccion}, rs1: {rs1}, rs2: {rs2}, label: {label}, inmediato calculado(nuevo PC): {inmediato}")
 
         binario = 0
-        binario |= ((inmediato & 0b1000000000000) << 31) #bit 12 del inmediato va al bit 31
-        binario |= ((inmediato & 0b0111110000000) << 25) #bits 10:5 del inmediato van a los bits 30:25
+        binario |= ((inmediato >> 12) & 0b1) << 31          # bit 12 -> bit 31
+        binario |= ((inmediato >> 5) & 0b111111) << 25      # bits 10:5 -> 30:25
         binario |= (rs2 << 20)
         binario |= (rs1 << 15)
-        binario |= (int(BType[instruccion][1], 2) << 12)
-        binario |= ((inmediato & 0b0000001111110) << 8) #bits 4:1 del inmediato van a los bits 11:8
-        binario |= ((inmediato & 0b0000000000001) << 7) #bit 11 del inmediato va al bit 7
-        binario |= (int(BType[instruccion][0], 2))
+        binario |= (int(BType[instruccion][1], 2) << 12)    # funct3 en binario
+        binario |= ((inmediato >> 1) & 0b1111) << 8         # bits 4:1 -> 11:8
+        binario |= ((inmediato >> 11) & 0b1) << 7            # bit 11 -> 7
+        binario |= int(BType[instruccion][0], 2)             # opcode en binario
+
 
         outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
         print(f"Binario: {bin(binario)[2:].zfill(32)}")
