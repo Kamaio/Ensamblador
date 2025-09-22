@@ -115,19 +115,15 @@ class ExprParser(Parser):
         else: 
             raise SyntaxError(f"Instrucción B no reconocida: {p.INSTRUCCION0}")
 
-    @_('INSTRUCCION REGISTRO INSTRUCCION')
+    @_('INSTRUCCION REGISTRO COMA INSTRUCCION')
     def expr(self, p):
         if(p.INSTRUCCION0 in JType):
-            return ("JType", p.INSTRUCCION0, p.REGISTRO0, p.INSTRUCCION1)
+            return ("JType", p.INSTRUCCION0, p.REGISTRO, p.INSTRUCCION1)
         else: 
             raise SyntaxError(f"Instrucción J no reconocida: {p.INSTRUCCION0}")
 
 
     '''
-    @_('INSTRUCCION REGISTRO REGISTRO INMEDIATO')
-    def expr(self, p):
-        return ('BType', p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
-
     @_('INSTRUCCION REGISTRO INMEDIATO')
     def expr(self, p):
         return ('UType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
@@ -305,19 +301,20 @@ for line in data.split('\n'):
         label = result[3]
 
         if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
+        inmediato = labels[label] - PC
         print(f"{inmediato} =+ {labels[label]} - {PC}")
 
-        inmediato = int(complementoA2((labels[label] - PC), 21), 2)
+        inmediato = int(complementoA2(inmediato, 21), 2)
         print(f"inmediato cambiado: {inmediato}")
 
 
         binario = 0
-        binario =| ((inmediato >> 31) & 0b1 ) << 31
-        binario =| ((inmediato >> 1) & 0b11111111111) << 21
-        binario =| ((inmediato >> 11) & 0b1) << 20
-        binario =| ((inmediato >> 12) & 0b11111111) << 12
-        binario =| (rs1 << 7)
-        binario =| int(JType[instruccion][0], 2)
+        binario |= ((inmediato >> 31) & 0b1 ) << 31
+        binario |= ((inmediato >> 1) & 0b11111111111) << 21
+        binario |= ((inmediato >> 11) & 0b1) << 20
+        binario |= ((inmediato >> 12) & 0b11111111) << 12
+        binario |= (rs1 << 7)
+        binario |= int(JType[instruccion][0], 2)
 
 
         outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
