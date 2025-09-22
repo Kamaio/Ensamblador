@@ -1,8 +1,1 @@
-addi x5, x0, 11
-
-
-
-beq x1, x5, cosa
-
-cosa:
-addi x5, x0, 11
+slli t1, t2, -11

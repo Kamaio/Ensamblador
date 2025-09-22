@@ -115,6 +115,13 @@ class ExprParser(Parser):
         else: 
             raise SyntaxError(f"Instrucción B no reconocida: {p.INSTRUCCION0}")
 
+    @_('INSTRUCCION REGISTRO INSTRUCCION')
+    def expr(self, p):
+        if(p.INSTRUCCION0 in JType):
+            return ("JType", p.INSTRUCCION0, p.REGISTRO0, p.INSTRUCCION1)
+        else: 
+            raise SyntaxError(f"Instrucción J no reconocida: {p.INSTRUCCION0}")
+
 
     '''
     @_('INSTRUCCION REGISTRO REGISTRO INMEDIATO')
@@ -202,23 +209,24 @@ for line in data.split('\n'):
         instruccion = IType[result[1]]
         rd = result[2]
         rs1 = result[3]
-        inmediato = result[4]
+        inmediato = int(complementoA2(result[4], 12), 2)
 
         print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+        
 
 
         if(result[1] == "slli" or result[1] == "srli"):
-            if(inmediato < 0 or inmediato > 31): raise ValueError(f"El inmediato para {instruccion} debe estar entre 0 y 31")
+            if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
             inmediato = bin(inmediato)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y lo convierte a binario de 12 bits
             inmediato = int(inmediato, 2)
 
         elif(result[1] == 'srai'):
-            if(inmediato < 0 or inmediato > 31): raise ValueError(f"El inmediato para {instruccion} debe estar entre 0 y 31")
+            if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
             inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y le pone el bit 10 en 1 para indicar que es srai
             inmediato = int(inmediato, 2)
 
         else:
-            if(inmediato < -2048 or inmediato > 2047): raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
+            if(result[4] < -2048 or result[4] > 2047): raise ValueError(f"El inmediato para {result[1]} debe estar entre -2048 y 2047")
 
         #ordena la instrucción en binario
         binario = 0
@@ -291,6 +299,33 @@ for line in data.split('\n'):
         outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
         print(f"Hexadecimal: {hex(binario)}")
         
+    if(result[0] == "JType"):
+        instruccion = result[1]
+        rs1 = result[2]
+        label = result[3]
+
+        if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
+        print(f"{inmediato} =+ {labels[label]} - {PC}")
+
+        inmediato = int(complementoA2((labels[label] - PC), 21), 2)
+        print(f"inmediato cambiado: {inmediato}")
+
+
+        binario = 0
+        binario =| ((inmediato >> 31) & 0b1 ) << 31
+        binario =| ((inmediato >> 1) & 0b11111111111) << 21
+        binario =| ((inmediato >> 11) & 0b1) << 20
+        binario =| ((inmediato >> 12) & 0b11111111) << 12
+        binario =| (rs1 << 7)
+        binario =| int(JType[instruccion][0], 2)
+
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+
 
 
     PC += 4
