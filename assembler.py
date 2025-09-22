@@ -122,17 +122,12 @@ class ExprParser(Parser):
         else: 
             raise SyntaxError(f"Instrucción J no reconocida: {p.INSTRUCCION0}")
 
-
-    '''
-    @_('INSTRUCCION REGISTRO INMEDIATO')
+    @_('INSTRUCCION REGISTRO COMA INMEDIATO')
     def expr(self, p):
-        return ('UType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
-
-    @_('INSTRUCCION REGISTRO INMEDIATO')
-    def expr(self, p):
-        return ('JType', p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
-    '''
-
+        if(p.INSTRUCCION in UType):
+            return ("UType", p.INSTRUCCION, p.REGISTRO, p.INMEDIATO)
+        else: 
+            raise SyntaxError(f"Instrucción U no reconocida: {p.INSTRUCCION0}")
 
 
 #--------------------------------------------------------------------------#        
@@ -209,7 +204,6 @@ for line in data.split('\n'):
 
         print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
         
-
 
         if(result[1] == "slli" or result[1] == "srli"):
             if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
@@ -323,6 +317,27 @@ for line in data.split('\n'):
         outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
         print(f"Hexadecimal: {hex(binario)}")
 
+    if(result[0] == "UType"):
+        instruccion = result[1]
+        rs1 = result[2]
+        inmediato = result[3]
+                                        #1.048.575 sin signo 20 bits
+        if(inmediato < 0 or inmediato > 1048575): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 1.048.575")
+
+        binario = 0
+        binario |= (inmediato) << 12
+        binario |= (rs1) << 7
+        binario |= int(UType[instruccion][0], 2)
+
+        print(f"andamos poniendo a: {bin(inmediato)}")
+
+
+        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+        print(f"Hexadecimal: {hex(binario)}")
+        
 
 
     PC += 4
