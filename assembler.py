@@ -98,12 +98,12 @@ class CalcLexer(Lexer):
             return None
         return t
 
-    @_(r'[a-zA-Z]+')
+    @_(r'[a-zA-Z0-9_]+')
     def INSTRUCCION(self, t):
         t.value = t.value.lower() #Normaliza a minúsculas
         #Valida contra los diccionarios
         if t.value not in DICCIONARIOS and t.value not in labels:
-            print("Error en instruccion")
+            print(f"Error en instruccion {t.value}")
             self.error(t)
             return None
         return t
