@@ -7,6 +7,40 @@ def complementoA2(val, bits):
         val = (1 << bits) + val
     return format(val & ((1 << bits) - 1), f'0{bits}b')
 
+
+def pseudo(line, original, labels):
+    print(f"Linea entregada a pseudo: {line}")
+
+    if  (line[0] == "nop"): return "addi x0, x0, 0"
+    elif(line[0] == "mv"): return f"addi {line[1]} {line[2]}, 0"
+    elif(line[0] == "not"): return f"xori {line[1]} {line[2]}, -1"
+    elif(line[0] == "neg"): return f"sub {line[1]} x0, {line[2]}"
+    elif(line[0] == "seqz"): return f"sltiu {line[1]} {line[2]}, 1"
+    elif(line[0] == "snez"): return f"sltu {line[1]} x0, {line[2]}"
+    elif(line[0] == "sltz"): return f"slt {line[1]} {line[2]}, x0"
+    elif(line[0] == "sgtz"): return f"slt {line[1]} x0, {line[2]}"
+    elif(line[0] == "beqz"): return f"beq {line[1]} x0, {line[2]}"
+    elif(line[0] == "bnez"): return f"bne {line[1]} x0, {line[2]}"
+    elif(line[0] == "blez"): return f"bge x0, {line[1]} {line[2]}"
+    elif(line[0] == "bgez"): return f"bge {line[1]} x0, {line[2]}"
+    elif(line[0] == "bltz"): return f"blt {line[1]} x0, {line[2]}"
+    elif(line[0] == "bgtz"): return f"blt x0, {line[1]} {line[2]}"
+    elif(line[0] == "bgt"): return f"blt {line[2]} {line[1]} {line[3]}"
+    elif(line[0] == "ble"): return f"bge {line[2]} {line[1]} {line[3]}"
+    elif(line[0] == "bgtu"): return f"bltu {line[2]} {line[1]} {line[3]}"
+    elif(line[0] == "bleu"): return f"bgeu {line[2]} {line[1]} {line[3]}"
+    elif(line[0] == "j"): return f"jal x0, {line[1]}"
+    elif(line[0] == "jal" and line[1] in labels): return f"jal x1, {line[1]}"
+    elif(line[0] == "jr"): return f"jalr x0, {line[1]}, 0"
+    elif(line[0] == "jalr" and len(line) <= 2): return f"jalr x1, {line[1]}, 0"
+    elif(line[0] == "ret"): return f"jalr x0, x1, 0"
+
+    else: 
+        print("SIGUIO NORMAL")
+        return original
+
+
+
 # Cargar diccionarios de instrucciones
 with open('BType.json') as f:
     BType = json.load(f)
@@ -25,6 +59,7 @@ with open('REGnames.json') as f:
 
 DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
 labels = {}
+
 
 class CalcLexer(Lexer):
     tokens = {"INSTRUCCION", "REGISTRO", "INMEDIATO", "COMA", "PARENTESIS1", "PARENTESIS2", }
@@ -97,7 +132,6 @@ class ExprParser(Parser):
         else: 
             raise SyntaxError(f"Instrucción I no reconocida: {p.INSTRUCCION}")
 
-
     @_('INSTRUCCION REGISTRO COMA INMEDIATO PARENTESIS1 REGISTRO PARENTESIS2')
     def expr(self, p):
         if(p.INSTRUCCION in IType):
@@ -106,7 +140,6 @@ class ExprParser(Parser):
             return ("SType", p.INSTRUCCION, p.REGISTRO0, p.REGISTRO1, p.INMEDIATO)
         else: 
             raise SyntaxError(f"Instrucción I o S no reconocida: {p.INSTRUCCION}")
-
 
     @_('INSTRUCCION REGISTRO COMA REGISTRO COMA INSTRUCCION')
     def expr(self, p):
@@ -132,9 +165,7 @@ class ExprParser(Parser):
 
 #--------------------------------------------------------------------------#        
 with open('input.asm') as f: data = f.read()
-
 PC = 0
-
 outputBinario = open("output.bin", "w")
 outputHexadecimal = open("output.hex", "w")
 
@@ -163,6 +194,8 @@ PC = 0
 for line in data.split('\n'):
     if(not line.strip() or line.strip().endswith(":")): continue #salta lineas vacias o labels
 
+    line = pseudo(line.strip().split(" "), line, labels) #revisa si es pseudo, si si devuelve su equivalente en standar, si no la deja igual
+
     #parte todo en pedazos
     lexer = CalcLexer()
     tokens = lexer.tokenize(line)
@@ -172,6 +205,8 @@ for line in data.split('\n'):
     parser = ExprParser()
     result = parser.parse(lexer.tokenize(line))
     print(result)
+
+    if(result is None): raise TypeError("Instruccion mal escrita")
 
     if(result[0] == "RType"):
         instruccion = RType[result[1]]
@@ -339,11 +374,6 @@ for line in data.split('\n'):
         print(f"Hexadecimal: {hex(binario)}")
         
 
-
     PC += 4
-
-
-
-    
 
 
