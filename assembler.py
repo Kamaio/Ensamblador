@@ -35,6 +35,9 @@ def pseudo(line, original, labels):
     elif(line[0] == "jalr" and len(line) <= 2): return f"jalr x1, {line[1]}, 0"
     elif(line[0] == "ret"): return f"jalr x0, x1, 0"
 
+    elif(line[0] == "ecall"): return f"ecall x0, x0, 0"
+    elif(line[0] == "ebreak"): return f"ebreak x0, x0, 1"
+
     else: 
         print("SIGUIO NORMAL")
         return original
