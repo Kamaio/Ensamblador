@@ -3,7 +3,7 @@
 .data
 myvar: .word 12
 otraotracosa: .byte "w"
-otraotraotracosa: .half 28
+otraotraotracosa: .half 0x10
 otraotraotraotracosa: .space 0
 otraotraotraotracosaotracosa: .ascii "hola como vamos"
 

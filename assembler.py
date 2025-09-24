@@ -41,7 +41,6 @@ def pseudo(line, original, labels):
         return original
 
 
-
 # Cargar diccionarios de instrucciones
 with open('BType.json') as f:
     BType = json.load(f)
@@ -115,7 +114,6 @@ class CalcLexer(Lexer):
     def error(self, t):
         print(f"Se ha encontrado un error de sintaxis--> '{t.value}' en la posición {self.index}")
         self.index += 1
-
 
 
 class ExprParser(Parser):
@@ -394,7 +392,7 @@ for line in data.split('\n'):
 
     else:
         line = line.strip().split(" ", 2)
-        if line[2].startswith('0x') or line[2].startswith('0X'): line[2] = int(t.value, 16)
+        if line[2].startswith('0x') or line[2].startswith('0X'): line[2] = int(line[2], 16)
         
         if(line[1] == ".word"):
             try:
