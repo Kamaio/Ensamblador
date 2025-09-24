@@ -1,5 +1,6 @@
 from sly import Lexer, Parser
 import json
+import textwrap
 
 
 def complementoA2(val, bits):
@@ -59,6 +60,8 @@ with open('REGnames.json') as f:
 
 DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
 labels = {}
+variables = {}
+infoGuardada = []
 
 
 class CalcLexer(Lexer):
@@ -191,189 +194,331 @@ print(f"labels: {labels}")
 
 #segunda pasada: organiza y guarda las instrucciones
 PC = 0
-for line in data.split('\n'):
-    if(not line.strip() or line.strip().endswith(":")): continue #salta lineas vacias o labels
+PCv = 0
+status = ".text"
+for line in data.split('\n'): 
+    if(not line.strip() or line.strip().endswith(":") or line.strip().startswith("#")): continue #salta lineas vacias o labels
 
-    line = pseudo(line.strip().split(" "), line, labels) #revisa si es pseudo, si si devuelve su equivalente en standar, si no la deja igual
+    if(line.strip() == ".data" and PC == 0): 
+        status = ".data"
+        continue
+    elif(line.strip() == ".text"):
+        status = ".text"
+        continue
+    elif(line.strip() == ".data"): raise SyntaxError("El .data debe estar en la primera linea")
 
-    #parte todo en pedazos
-    lexer = CalcLexer()
-    tokens = lexer.tokenize(line)
-    for tok in tokens: print(f"{tok.type}: {tok.value}")
 
-    #mira la estructura y si coincide con las reglas devuelve la informacion
-    parser = ExprParser()
-    result = parser.parse(lexer.tokenize(line))
-    print(result)
+    if(status == ".text"):
+        line = pseudo(line.strip().split(" "), line, labels) #revisa si es pseudo, si si devuelve su equivalente en standar, si no la deja igual
 
-    if(result is None): raise TypeError("Instruccion mal escrita")
+        #parte todo en pedazos
+        lexer = CalcLexer()
+        tokens = lexer.tokenize(line)
+        for tok in tokens: print(f"{tok.type}: {tok.value}")
 
-    if(result[0] == "RType"):
-        instruccion = RType[result[1]]
-        rd = result[2]
-        rs1 = result[3]
-        rs2 = result[4]
+        #mira la estructura y si coincide con las reglas devuelve la informacion
+        parser = ExprParser()
+        result = parser.parse(lexer.tokenize(line))
+        print(result)
 
-        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, rs2: {rs2}")
+        if(result is None): raise TypeError("Instruccion mal escrita")
 
-        #ordena la instrucción en binario
-        binario = 0
-        binario |= (int(instruccion[2], 2) << 25)
-        binario |= (rs2 << 20)
-        binario |= (rs1 << 15)
-        binario |= (int(instruccion[1], 2) << 12)
-        binario |= (rd << 7)
-        binario |= (int(instruccion[0], 2))
+        if(result[0] == "RType"):
+            instruccion = RType[result[1]]
+            rd = result[2]
+            rs1 = result[3]
+            rs2 = result[4]
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+            print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, rs2: {rs2}")
 
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
+            #ordena la instrucción en binario
+            binario = 0
+            binario |= (int(instruccion[2], 2) << 25)
+            binario |= (rs2 << 20)
+            binario |= (rs1 << 15)
+            binario |= (int(instruccion[1], 2) << 12)
+            binario |= (rd << 7)
+            binario |= (int(instruccion[0], 2))
 
-    if(result[0] == "IType"):
-        instruccion = IType[result[1]]
-        rd = result[2]
-        rs1 = result[3]
-        inmediato = int(complementoA2(result[4], 12), 2)
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-        print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            print(f"Hexadecimal: {hex(binario)}")
+
+        if(result[0] == "IType"):
+            instruccion = IType[result[1]]
+            rd = result[2]
+            rs1 = result[3]
+            inmediato = int(complementoA2(result[4], 12), 2)
+
+            print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+            
+
+            if(result[1] == "slli" or result[1] == "srli"):
+                if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
+                inmediato = bin(inmediato)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y lo convierte a binario de 12 bits
+                inmediato = int(inmediato, 2)
+
+            elif(result[1] == 'srai'):
+                if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
+                inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y le pone el bit 10 en 1 para indicar que es srai
+                inmediato = int(inmediato, 2)
+
+            else:
+                if(result[4] < -2048 or result[4] > 2047): raise ValueError(f"El inmediato para {result[1]} debe estar entre -2048 y 2047")
+
+            #ordena la instrucción en binario
+            binario = 0
+            binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
+            binario |= (rs1 << 15)
+            binario |= (int(instruccion[1], 2) << 12)
+            binario |= (rd << 7)
+            binario |= (int(instruccion[0], 2))
+
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            print(f"Hexadecimal: {hex(binario)}")
+
+        if(result[0] == "SType"):
+            instruccion = SType[result[1]]
+            rs2 = result[2]
+            rs1 = result[3]
+            inmediato = result[4]
+            print(f"Instrucción: {instruccion}, rs2: {rs2}, rs1: {rs1}, inmediato: {inmediato}")
+
+            if inmediato < -2048 or inmediato > 2047: raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
+            inmediato = int(complementoA2(inmediato, 12), 2)
+            print(f"inmediato que estamos procesando: {inmediato}")
+
+            binario = 0
+            binario |= ((inmediato >> 5) & 0b1111111) << 25
+            binario |= (rs2 << 20)
+            binario |= (rs1 << 15)
+            binario |= (int(instruccion[1], 2) << 12)
+            # bits 4:0 -> pos 11:7
+            binario |= (inmediato & 0b11111) << 7
+            binario |= int(instruccion[0], 2)
+
+            binario_str = bin(binario)[2:].zfill(32)
+            print(f"Binario: {binario_str}\nHexadecimal: {hex(binario)}")
+    
+        if(result[0] == "BType"):
+            instruccion = result[1]
+            rs1 = result[2]
+            rs2 = result[3]
+            label = result[4]
+
+            if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
+            inmediato = labels[label] - PC
+            print(f"{inmediato} =+ {labels[label]} - {PC}")
+
+            inmediato = int(complementoA2(inmediato, 13), 2)
+            #inmediato = inmediato >> 6 #si es negativo se convierte a complemento a 2 de 13 bits
+            print(f"inmediato que estamos procesando: {bin(inmediato & 0b1111111111111)}")
+            print(f"que hace esto? {bin(inmediato & 0b1000000000000)}")
+
+            print(f"Instrucción: {instruccion}, rs1: {rs1}, rs2: {rs2}, label: {label}, inmediato calculado(nuevo PC): {inmediato}")
+
+            binario = 0
+            binario |= ((inmediato >> 12) & 0b1) << 31          # bit 12 -> bit 31
+            binario |= ((inmediato >> 5) & 0b111111) << 25      # bits 10:5 -> 30:25
+            binario |= (rs2 << 20)
+            binario |= (rs1 << 15)
+            binario |= (int(BType[instruccion][1], 2) << 12)    # funct3 en binario
+            binario |= ((inmediato >> 1) & 0b1111) << 8         # bits 4:1 -> 11:8
+            binario |= ((inmediato >> 11) & 0b1) << 7            # bit 11 -> 7
+            binario |= int(BType[instruccion][0], 2)             # opcode en binario
+
+
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            print(f"Hexadecimal: {hex(binario)}")
+            
+        if(result[0] == "JType"):
+            instruccion = result[1]
+            rs1 = result[2]
+            label = result[3]
+
+            if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
+            inmediato = labels[label] - PC
+            print(f"{inmediato} =+ {labels[label]} - {PC}")
+
+            inmediato = int(complementoA2(inmediato, 21), 2)
+            print(f"inmediato cambiado: {inmediato}")
+
+
+            binario = 0
+            binario |= ((inmediato >> 31) & 0b1 ) << 31
+            binario |= ((inmediato >> 1) & 0b11111111111) << 21
+            binario |= ((inmediato >> 11) & 0b1) << 20
+            binario |= ((inmediato >> 12) & 0b11111111) << 12
+            binario |= (rs1 << 7)
+            binario |= int(JType[instruccion][0], 2)
+
+
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            print(f"Hexadecimal: {hex(binario)}")
+
+        if(result[0] == "UType"):
+            instruccion = result[1]
+            rs1 = result[2]
+            inmediato = result[3]
+                                            #1.048.575 sin signo 20 bits
+            if(inmediato < 0 or inmediato > 1048575): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 1.048.575")
+
+            binario = 0
+            binario |= (inmediato) << 12
+            binario |= (rs1) << 7
+            binario |= int(UType[instruccion][0], 2)
+
+            print(f"andamos poniendo a: {bin(inmediato)}")
+
+
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            print(f"Hexadecimal: {hex(binario)}")
+            
+
+        PC += 4
+
+
+    else:
+        line = line.strip().split(" ", 2)
+        if line[2].startswith('0x') or line[2].startswith('0X'): line[2] = int(t.value, 16)
         
+        if(line[1] == ".word"):
+            try:
+                line[2] = complementoA2(int(line[2]), 32)
+                print(f"numero: {line[2]}")
+                cadena = textwrap.wrap(line[2].zfill(32), 8)
 
-        if(result[1] == "slli" or result[1] == "srli"):
-            if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
-            inmediato = bin(inmediato)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y lo convierte a binario de 12 bits
-            inmediato = int(inmediato, 2)
+                infoGuardada.append(cadena[3])
+                infoGuardada.append(cadena[2])
+                infoGuardada.append(cadena[1])
+                infoGuardada.append(cadena[0])
 
-        elif(result[1] == 'srai'):
-            if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
-            inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y le pone el bit 10 en 1 para indicar que es srai
-            inmediato = int(inmediato, 2)
+                variables[line[0]] = PCv
+                PCv += 4
+            except ValueError:
+                raise SyntaxError(f".word solo acepta int, recibido: {line[2]}")
 
-        else:
-            if(result[4] < -2048 or result[4] > 2047): raise ValueError(f"El inmediato para {result[1]} debe estar entre -2048 y 2047")
+        elif(line[1] == ".dword"):
+            try:
+                line[2] = complementoA2(int(line[2]), 64)
+                print(f"numero: {line[2]}")
+                cadena = textwrap.wrap(line[2].zfill(64), 8)
 
-        #ordena la instrucción en binario
-        binario = 0
-        binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
-        binario |= (rs1 << 15)
-        binario |= (int(instruccion[1], 2) << 12)
-        binario |= (rd << 7)
-        binario |= (int(instruccion[0], 2))
+                infoGuardada.append(cadena[7])
+                infoGuardada.append(cadena[6])
+                infoGuardada.append(cadena[5])
+                infoGuardada.append(cadena[4])
+                infoGuardada.append(cadena[3])
+                infoGuardada.append(cadena[2])
+                infoGuardada.append(cadena[1])
+                infoGuardada.append(cadena[0])
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+                variables[line[0]] = PCv
+                PCv += 8
+            except ValueError:
+                raise SyntaxError(f".dword solo acepta int, recibido: {line[2]}")
 
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
+        elif(line[1] == ".byte"):
+            try:
+                line[2] = ord(line[2][1:-1])
+                line[2] = complementoA2(int(line[2]), 8)
+                print(f"letra en numero: {line[2]}")
+                cadena = textwrap.wrap(line[2].zfill(8), 8)
 
-    if(result[0] == "SType"):
-        instruccion = SType[result[1]]
-        rs2 = result[2]
-        rs1 = result[3]
-        inmediato = result[4]
-        print(f"Instrucción: {instruccion}, rs2: {rs2}, rs1: {rs1}, inmediato: {inmediato}")
+                infoGuardada.append(cadena[0])
 
-        if inmediato < -2048 or inmediato > 2047: raise ValueError(f"El inmediato para {instruccion} debe estar entre -2048 y 2047")
-        inmediato = int(complementoA2(inmediato, 12), 2)
-        print(f"inmediato que estamos procesando: {inmediato}")
+                variables[line[0]] = PCv
+                PCv += 1         
+            
+            except TypeError:
+                try:
+                    line[2] = complementoA2(int(line[2]), 8)
+                    print(f"numero: {line[2]}")
+                    cadena = textwrap.wrap(line[2].zfill(8), 8)
 
-        binario = 0
-        binario |= ((inmediato >> 5) & 0b1111111) << 25
-        binario |= (rs2 << 20)
-        binario |= (rs1 << 15)
-        binario |= (int(instruccion[1], 2) << 12)
-        # bits 4:0 -> pos 11:7
-        binario |= (inmediato & 0b11111) << 7
-        binario |= int(instruccion[0], 2)
+                    infoGuardada.append(cadena[0])
 
-        binario_str = bin(binario)[2:].zfill(32)
-        print(f"Binario: {binario_str}\nHexadecimal: {hex(binario)}")
- 
-    if(result[0] == "BType"):
-        instruccion = result[1]
-        rs1 = result[2]
-        rs2 = result[3]
-        label = result[4]
+                    variables[line[0]] = PCv
+                    PCv += 1
 
-        if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
-        inmediato = labels[label] - PC
-        print(f"{inmediato} =+ {labels[label]} - {PC}")
+                except ValueError:
+                    if(not line[2].startswith("\"") or not line[2].endswith("\"" )): raise SyntaxError("Los strings deben ir entre comillas")
+                    raise SyntaxError(f".byte solo acepta int o un solo caracter, recibido: {line[2]}")
 
-        inmediato = int(complementoA2(inmediato, 13), 2)
-        #inmediato = inmediato >> 6 #si es negativo se convierte a complemento a 2 de 13 bits
-        print(f"inmediato que estamos procesando: {bin(inmediato & 0b1111111111111)}")
-        print(f"que hace esto? {bin(inmediato & 0b1000000000000)}")
+        elif(line[1] == ".half"):
+            try:
+                line[2] = complementoA2(int(line[2]), 16)
+                print(f"numero: {line[2]}")
+                cadena = textwrap.wrap(line[2].zfill(16), 8)
 
-        print(f"Instrucción: {instruccion}, rs1: {rs1}, rs2: {rs2}, label: {label}, inmediato calculado(nuevo PC): {inmediato}")
+                infoGuardada.append(cadena[1])
+                infoGuardada.append(cadena[0])
 
-        binario = 0
-        binario |= ((inmediato >> 12) & 0b1) << 31          # bit 12 -> bit 31
-        binario |= ((inmediato >> 5) & 0b111111) << 25      # bits 10:5 -> 30:25
-        binario |= (rs2 << 20)
-        binario |= (rs1 << 15)
-        binario |= (int(BType[instruccion][1], 2) << 12)    # funct3 en binario
-        binario |= ((inmediato >> 1) & 0b1111) << 8         # bits 4:1 -> 11:8
-        binario |= ((inmediato >> 11) & 0b1) << 7            # bit 11 -> 7
-        binario |= int(BType[instruccion][0], 2)             # opcode en binario
+                variables[line[0]] = PCv
+                PCv += 2
+            except ValueError:
+                raise SyntaxError(f".half solo acepta int, recibido: {line[2]}")
 
+        elif(line[1] == ".space"):
+            try:
+                line[2] = int(line[2])
+                print(f"numero: {line[2]}")
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+                for i in range(line[2]): infoGuardada.append("00000000")
 
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
-        
-    if(result[0] == "JType"):
-        instruccion = result[1]
-        rs1 = result[2]
-        label = result[3]
+                variables[line[0]] = PCv
+                PCv += line[2]
+            except ValueError:
+                raise SyntaxError(f".word solo acepta int, recibido: {line[2]}")
 
-        if label not in labels: raise ValueError(f"Etiqueta no encontrada: {label}")
-        inmediato = labels[label] - PC
-        print(f"{inmediato} =+ {labels[label]} - {PC}")
+        elif(line[1] == ".ascii"):
+            try:
+                if(line[2][0] != "\"" or line[2][-1] != "\""): raise SyntaxError("Los strings deben ir entre comillas")
+                line[2] = list(line[2])[1:-1]
 
-        inmediato = int(complementoA2(inmediato, 21), 2)
-        print(f"inmediato cambiado: {inmediato}")
+                for caracter in line[2]:
+                    print(caracter)
+                    caracter = ord(caracter)
+                    caracter = complementoA2(int(caracter), 8)
+                    print(f"letra en numero: {caracter}")
+                    cadena = textwrap.wrap(caracter.zfill(8), 8)
 
+                    infoGuardada.append(cadena[0])
+            except ValueError:
+                raise SyntaxError(f"recibido: {line[2]}")
 
-        binario = 0
-        binario |= ((inmediato >> 31) & 0b1 ) << 31
-        binario |= ((inmediato >> 1) & 0b11111111111) << 21
-        binario |= ((inmediato >> 11) & 0b1) << 20
-        binario |= ((inmediato >> 12) & 0b11111111) << 12
-        binario |= (rs1 << 7)
-        binario |= int(JType[instruccion][0], 2)
+        elif(line[1] == ".asciz" or line[1] == ".string"):
+            try:
+                if(line[2][0] != "\"" or line[2][-1] != "\""): raise SyntaxError("Los strings deben ir entre comillas")
+                line[2] = list(line[2])[1:-1]
+                if(not line[2].startswith("\"") or not line[2].endswith("\"" )): raise SyntaxError("Los strings deben ir entre comillas")
 
+                for caracter in line[2]:
+                    caracter = ord(caracter)
+                    caracter = complementoA2(int(caracter), 8)
+                    print(f"letra en numero: {caracter}")
+                    cadena = textwrap.wrap(caracter.zfill(8), 8)
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
+                    infoGuardada.append(cadena[0])
 
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
-
-    if(result[0] == "UType"):
-        instruccion = result[1]
-        rs1 = result[2]
-        inmediato = result[3]
-                                        #1.048.575 sin signo 20 bits
-        if(inmediato < 0 or inmediato > 1048575): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 1.048.575")
-
-        binario = 0
-        binario |= (inmediato) << 12
-        binario |= (rs1) << 7
-        binario |= int(UType[instruccion][0], 2)
-
-        print(f"andamos poniendo a: {bin(inmediato)}")
+                infoGuardada.append("00000000")
+            except ValueError:
+                raise SyntaxError(f".word solo acepta int, recibido: {line[2]}")
 
 
-        outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
-        print(f"Binario: {bin(binario)[2:].zfill(32)}")
-
-        outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
-        print(f"Hexadecimal: {hex(binario)}")
-        
-
-    PC += 4
-
-
+print(variables)
+print(infoGuardada)

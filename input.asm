@@ -1,4 +1,18 @@
+
+
+.data
+myvar: .word 12
+otraotracosa: .byte "w"
+otraotraotracosa: .half 28
+otraotraotraotracosa: .space 0
+otraotraotraotracosaotracosa: .ascii "hola como vamos"
+
+
+.text
+
+
 addi x1, x2, -3
+#hola gente estoy doramion
 nop
 mv x1, x2
 not x1, x2
@@ -22,10 +36,6 @@ jal cosa
 jr x1
 jalr x1
 ret
-
-
-
-
 
 
 cosa:
