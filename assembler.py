@@ -41,7 +41,7 @@ def pseudo(line, original, labels):
         return original
 
 
-# Cargar diccionarios de instrucciones
+#load instructions dictionaries
 with open('BType.json') as f:
     BType = json.load(f)
 with open('IType.json') as f:
@@ -58,9 +58,9 @@ with open('REGnames.json') as f:
     REGnames = json.load(f)
 
 DICCIONARIOS = set(BType) | set(IType) | set(JType) | set(RType) | set(SType) | set(UType)
-labels = {}
-variables = {}
-infoGuardada = []
+labels = {} #stores labels and PC
+variables = {} #stores .data variables names with theirs PCs
+infoGuardada = [] #stores .data values
 
 
 class CalcLexer(Lexer):
@@ -78,12 +78,12 @@ class CalcLexer(Lexer):
     def REGISTRO(self, t):
         try:
             if t.value.startswith('x'):
-                t.value = int(t.value[1:]) #elimina la 'x' y deja el resto
+                t.value = int(t.value[1:]) #deletes the X from the registers
             else:
-                t.value = REGnames[t.value] #elimina la 'x' y deja el resto
+                t.value = REGnames[t.value] #searchs on the list of others names for registers
         except ValueError:
             print("Error en registro")
-            self.error(t) #si no se pudo cambiar a numero entonces no era un numero y se manda a la mierda
+            self.error(t) #if something from above trows an error, then we send "error"
             return None
         return t
 
@@ -91,20 +91,20 @@ class CalcLexer(Lexer):
     def INMEDIATO(self, t):
         try:
             if t.value.startswith('0x') or t.value.startswith('0X'):
-                t.value = int(t.value, 16)#Si esta en hexadecimal 0x entones lo intenta convertir a int hexadecimal
+                t.value = int(t.value, 16)#if value is an hexadecimal then we cast it to decimal
             else:
-                t.value = int(t.value)#si no simplemente lo cambia a un numero normal
+                t.value = int(t.value)#if value is not an hexadecimal we cast the value to int
         except ValueError:
             print("Error en inmediato")
-            self.error(t)#si no se pudo cambiar a numero entonces no era un numero y se manda a la mierda
+            self.error(t)#if something from above trows an error, then its not a valid number and we send "error"
             return None
         return t
 
     @_(r'[a-zA-Z]+')
     def INSTRUCCION(self, t):
-        t.value = t.value.lower() #Normaliza a minúsculas
-        #Valida contra los diccionarios
-        if t.value not in DICCIONARIOS and t.value not in labels:
+        t.value = t.value.lower() #normalize to lowercase
+        
+        if t.value not in DICCIONARIOS and t.value not in labels: #search on dictionaries
             print("Error en instruccion")
             self.error(t)
             return None
@@ -172,30 +172,30 @@ outputHexadecimal = open("output.hex", "w")
 
 
 
-#primera pasada: busca las etiquetas y las guarda en un diccionario con su posición
+#first pass: search the labels and storage it on a dictionarie with their position
 for line in data.split('\n'):
     
     if(line.strip().endswith(":")): 
 
         if(" " in line.strip()[:-1]): raise SyntaxError("No se permiten espacios en las etiquetas")
 
-        label = line.strip()[:-1] #elimina los espacios y los dos puntos
+        label = line.strip()[:-1] #delete the spaces at the start and at the ending
         labels[label] = PC
         continue
 
-    if(not line.strip()): continue #salta lineas vacias
+    if(not line.strip()): continue #skip empty lines
     else: PC += 4
 
 print(f"labels: {labels}")
 
 
 
-#segunda pasada: organiza y guarda las instrucciones
+#second pass: organize and saves instructions
 PC = 0
 PCv = 0
 status = ".text"
 for line in data.split('\n'): 
-    if(not line.strip() or line.strip().endswith(":") or line.strip().startswith("#")): continue #salta lineas vacias o labels
+    if(not line.strip() or line.strip().endswith(":") or line.strip().startswith("#")): continue #skips empty lines and labels
 
     if(line.strip() == ".data" and PC == 0): 
         status = ".data"
@@ -207,14 +207,14 @@ for line in data.split('\n'):
 
 
     if(status == ".text"):
-        line = pseudo(line.strip().split(" "), line, labels) #revisa si es pseudo, si si devuelve su equivalente en standar, si no la deja igual
+        line = pseudo(line.strip().split(" "), line, labels) #check for pseudo, if yes return their equivalent on standar, if not it leave as it is
 
-        #parte todo en pedazos
+        #it splits it on parts
         lexer = CalcLexer()
         tokens = lexer.tokenize(line)
         for tok in tokens: print(f"{tok.type}: {tok.value}")
 
-        #mira la estructura y si coincide con las reglas devuelve la informacion
+        #check the structure and if it coincides with the rules of the instructions returns the information
         parser = ExprParser()
         result = parser.parse(lexer.tokenize(line))
         print(result)
@@ -229,7 +229,8 @@ for line in data.split('\n'):
 
             print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, rs2: {rs2}")
 
-            #ordena la instrucción en binario
+            if(rd == 0): raise SyntaxError("X0 no es mutable por lo que no puede ser usado como rd")
+            #organizes the instruction on binary
             binario = 0
             binario |= (int(instruccion[2], 2) << 25)
             binario |= (rs2 << 20)
@@ -238,10 +239,10 @@ for line in data.split('\n'):
             binario |= (rd << 7)
             binario |= (int(instruccion[0], 2))
 
-            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
             print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hexa
             print(f"Hexadecimal: {hex(binario)}")
 
         if(result[0] == "IType"):
@@ -251,33 +252,34 @@ for line in data.split('\n'):
             inmediato = int(complementoA2(result[4], 12), 2)
 
             print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
+            if(rd == 0): raise SyntaxError("X0 no es mutable por lo que no puede ser usado como rd")
             
 
             if(result[1] == "slli" or result[1] == "srli"):
                 if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
-                inmediato = bin(inmediato)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y lo convierte a binario de 12 bits
+                inmediato = bin(inmediato)[2:].zfill(12) #takes only the last 5 digits and cast it to binary of 12 bits
                 inmediato = int(inmediato, 2)
 
             elif(result[1] == 'srai'):
                 if(result[4] < 0 or result[4] > 31): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 31")
-                inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #toma solo los ultimos 5 bits del inmediato y le pone el bit 10 en 1 para indicar que es srai
+                inmediato = bin(inmediato | 0b010000000000)[2:].zfill(12) #takes only the last 5 bits and put the 10 bit on 1 to indicate that its srai
                 inmediato = int(inmediato, 2)
 
             else:
                 if(result[4] < -2048 or result[4] > 2047): raise ValueError(f"El inmediato para {result[1]} debe estar entre -2048 y 2047")
 
-            #ordena la instrucción en binario
+            #organizes the instruction on binary
             binario = 0
-            binario |= ((inmediato & 0b111111111111) << 20) #toma solo los ultimos 12 bits del inmediato
+            binario |= ((inmediato & 0b111111111111) << 20) #takes only the last 12 bits
             binario |= (rs1 << 15)
             binario |= (int(instruccion[1], 2) << 12)
             binario |= (rd << 7)
             binario |= (int(instruccion[0], 2))
 
-            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
             print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hex
             print(f"Hexadecimal: {hex(binario)}")
 
         if(result[0] == "SType"):
@@ -314,7 +316,7 @@ for line in data.split('\n'):
             print(f"{inmediato} =+ {labels[label]} - {PC}")
 
             inmediato = int(complementoA2(inmediato, 13), 2)
-            #inmediato = inmediato >> 6 #si es negativo se convierte a complemento a 2 de 13 bits
+            #inmediato = inmediato >> 6 if its negative it cast it to complement a2 of 13 bits
             print(f"inmediato que estamos procesando: {bin(inmediato & 0b1111111111111)}")
             print(f"que hace esto? {bin(inmediato & 0b1000000000000)}")
 
@@ -325,16 +327,16 @@ for line in data.split('\n'):
             binario |= ((inmediato >> 5) & 0b111111) << 25      # bits 10:5 -> 30:25
             binario |= (rs2 << 20)
             binario |= (rs1 << 15)
-            binario |= (int(BType[instruccion][1], 2) << 12)    # funct3 en binario
+            binario |= (int(BType[instruccion][1], 2) << 12)    # funct3
             binario |= ((inmediato >> 1) & 0b1111) << 8         # bits 4:1 -> 11:8
             binario |= ((inmediato >> 11) & 0b1) << 7            # bit 11 -> 7
-            binario |= int(BType[instruccion][0], 2)             # opcode en binario
+            binario |= int(BType[instruccion][0], 2)             # opcode
 
 
-            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
             print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hexa
             print(f"Hexadecimal: {hex(binario)}")
             
         if(result[0] == "JType"):
@@ -359,17 +361,17 @@ for line in data.split('\n'):
             binario |= int(JType[instruccion][0], 2)
 
 
-            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
             print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hexa
             print(f"Hexadecimal: {hex(binario)}")
 
         if(result[0] == "UType"):
             instruccion = result[1]
             rs1 = result[2]
             inmediato = result[3]
-                                            #1.048.575 sin signo 20 bits
+                                            #1.048.575 no sign of 20 bits
             if(inmediato < 0 or inmediato > 1048575): raise ValueError(f"El inmediato para {result[1]} debe estar entre 0 y 1.048.575")
 
             binario = 0
@@ -380,10 +382,10 @@ for line in data.split('\n'):
             print(f"andamos poniendo a: {bin(inmediato)}")
 
 
-            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #escribe en el archivo el binario de 32 bits
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
             print(f"Binario: {bin(binario)[2:].zfill(32)}")
 
-            outputHexadecimal.write(f"\n{hex(binario)}") #escribe en el archivo el binario en hexadecimal
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hexa
             print(f"Hexadecimal: {hex(binario)}")
             
 
