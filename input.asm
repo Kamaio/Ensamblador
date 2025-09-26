@@ -10,7 +10,7 @@ otraotraotraotracosaotracosa: .ascii "hola como vamos"
 
 .text
 
-
+addi x0, x1, -2000
 addi x1, x2, -3
 #hola gente estoy doramion
 nop
