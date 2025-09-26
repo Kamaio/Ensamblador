@@ -36,6 +36,9 @@ def pseudo(line, original, labels):
     elif(line[0] == "jalr" and len(line) <= 2): return f"jalr x1, {line[1]}, 0"
     elif(line[0] == "ret"): return f"jalr x0, x1, 0"
 
+    elif(line[0] == "ecall"): return "ecall x0, x0, 0"
+    elif(line[0] == "ebreak"): return "ebreak x0, x0, 1"
+
     else: 
         print("SIGUIO NORMAL")
         return original
@@ -252,7 +255,7 @@ for line in data.split('\n'):
             inmediato = int(complementoA2(result[4], 12), 2)
 
             print(f"Instrucción: {instruccion}, rd: {rd}, rs1: {rs1}, inmediato: {inmediato}")
-            if(rd == 0): raise SyntaxError("X0 no es mutable por lo que no puede ser usado como rd")
+            if(rd == 0 and result[1] != "ecall" and result[1] != "ebreak" and result[1] != "jalr"): raise SyntaxError("X0 no es mutable por lo que no puede ser usado como rd")
             
 
             if(result[1] == "slli" or result[1] == "srli"):
@@ -302,8 +305,11 @@ for line in data.split('\n'):
             binario |= (inmediato & 0b11111) << 7
             binario |= int(instruccion[0], 2)
 
-            binario_str = bin(binario)[2:].zfill(32)
-            print(f"Binario: {binario_str}\nHexadecimal: {hex(binario)}")
+            outputBinario.write(f"\n{bin(binario)[2:].zfill(32)} + {PC}") #writes on the file the binary instruction of 32 bits
+            print(f"Binario: {bin(binario)[2:].zfill(32)}")
+
+            outputHexadecimal.write(f"\n{hex(binario)}") #writes on the file the binary on hex
+            print(f"Hexadecimal: {hex(binario)}")
     
         if(result[0] == "BType"):
             instruccion = result[1]
